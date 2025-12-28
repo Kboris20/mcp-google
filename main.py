@@ -307,7 +307,13 @@ def gmail_list_messages(
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
 ) -> dict:
-    """Liste les messages Gmail selon une requête."""
+    """
+    Liste les messages Gmail selon une requête.
+
+    Args:
+        query: Requête Gmail (ex: 'is:unread', 'from:xxx', 'subject:urgent').
+        max_results: Nombre max (1–100).
+    """
     try:
         service = get_gmail_service()
         max_results_clamped = min(max(1, max_results), 100)
@@ -341,13 +347,18 @@ def gmail_get_message_summary(
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
 ) -> dict:
-    """Récupère un résumé détaillé et exploitable d'un message Gmail."""
+    """
+    Récupère un résumé détaillé et exploitable d'un message Gmail.
+
+    Args:
+        message_id: ID du message Gmail
+    """
     return _get_message_summary_internal(message_id)
 
 
 @mcp.tool
 def gmail_get_multiple_summaries(
-    message_ids: List[Any],
+    message_ids: List[str],  # important : schéma "array of string" pour l'IA
     # Paramètres système n8n (ignorés)
     sessionId: Optional[str] = None,
     action: Optional[str] = None,
@@ -356,50 +367,67 @@ def gmail_get_multiple_summaries(
 ) -> dict:
     """
     Récupère les résumés de plusieurs messages en une seule fois.
-    Accepte une liste d'IDs (str) ou une liste d'objets contenant un champ 'id'.
+
+    Args:
+        message_ids: Liste d'identifiants de messages Gmail (strings).
+                     Si l'IA envoie par erreur des objets, on tente d'en extraire un champ 'id' ou 'message_id'.
     """
     try:
-        normalized_ids: List[str] = []
+        summaries: List[dict] = []
         errors: List[dict] = []
 
-        # Normalisation des identifiants (str OU dict avec "id")
-        for idx, item in enumerate(message_ids):
-            if isinstance(item, str):
-                normalized_ids.append(item)
-            elif isinstance(item, dict):
-                if "id" in item:
-                    normalized_ids.append(str(item["id"]))
-                elif "message_id" in item:
-                    normalized_ids.append(str(item["message_id"]))
-                else:
-                    errors.append(
-                        {
-                            "index": idx,
-                            "raw": item,
-                            "error": "Objet sans champ 'id' ni 'message_id'",
-                        }
-                    )
+        if not isinstance(message_ids, list):
+            return {
+                "success": False,
+                "count": 0,
+                "summaries": [],
+                "errors": [
+                    {
+                        "error": "message_ids doit être une liste de chaînes de caractères.",
+                        "received_type": str(type(message_ids)),
+                    }
+                ],
+            }
+
+        for idx, raw_item in enumerate(message_ids):
+            # Tolérance : si l'IA envoie un dict, on tente d'extraire l'id
+            actual_id: Optional[str] = None
+
+            if isinstance(raw_item, str):
+                actual_id = raw_item
+            elif isinstance(raw_item, dict):
+                if "id" in raw_item:
+                    actual_id = str(raw_item["id"])
+                elif "message_id" in raw_item:
+                    actual_id = str(raw_item["message_id"])
             else:
                 errors.append(
                     {
                         "index": idx,
-                        "raw": str(item),
-                        "error": f"Type non supporté pour message_id: {type(item).__name__}",
+                        "raw": str(raw_item),
+                        "error": f"Type non supporté pour message_id: {type(raw_item).__name__}",
                     }
                 )
+                continue
 
-        summaries: List[dict] = []
-        for msg_id in normalized_ids:
-            r = _get_message_summary_internal(msg_id)
+            if not actual_id:
+                errors.append(
+                    {
+                        "index": idx,
+                        "raw": str(raw_item),
+                        "error": "ID introuvable dans l'élément",
+                    }
+                )
+                continue
+
+            r = _get_message_summary_internal(actual_id)
             if r.get("success"):
                 summaries.append(r)
             else:
-                errors.append({"id": msg_id, "error": r.get("error")})
-
-        success = len(summaries) > 0
+                errors.append({"id": actual_id, "error": r.get("error")})
 
         return {
-            "success": success,
+            "success": len(summaries) > 0,
             "count": len(summaries),
             "summaries": summaries,
             "errors": errors,
@@ -423,7 +451,9 @@ def gmail_list_labels(
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
 ) -> dict:
-    """Liste tous les labels Gmail de l'utilisateur."""
+    """
+    Liste tous les labels Gmail de l'utilisateur.
+    """
     try:
         service = get_gmail_service()
         results = service.users().labels().list(userId="me").execute()
@@ -453,7 +483,9 @@ def gmail_find_label(
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
 ) -> dict:
-    """Recherche un label par nom (exact ou approximatif)."""
+    """
+    Recherche un label par nom (exact ou approximatif).
+    """
     return _find_label_internal(name, fuzzy)
 
 
@@ -466,7 +498,9 @@ def gmail_create_label(
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
 ) -> dict:
-    """Crée un nouveau label Gmail."""
+    """
+    Crée un nouveau label Gmail.
+    """
     return _create_label_internal(name)
 
 
@@ -479,10 +513,13 @@ def gmail_delete_label(
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
 ) -> dict:
-    """Supprime un label Gmail (n'affecte pas les messages)."""
+    """
+    Supprime un label Gmail (n'affecte pas les messages, retire juste le label).
+    """
     try:
         service = get_gmail_service()
         service.users().labels().delete(userId="me", id=label_id).execute()
+
         return {
             "success": True,
             "message": f"Label {label_id} supprimé avec succès."
@@ -505,7 +542,10 @@ def gmail_add_labels(
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
 ) -> dict:
-    """Ajoute un ou plusieurs labels à une liste de messages."""
+    """
+    Ajoute un ou plusieurs labels à une liste de messages.
+    Peut créer automatiquement les labels s'ils n'existent pas.
+    """
     return _add_labels_internal(message_ids, label_names, create_if_missing)
 
 
@@ -519,7 +559,9 @@ def gmail_remove_labels(
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
 ) -> dict:
-    """Retire un ou plusieurs labels d'une liste de messages."""
+    """
+    Retire un ou plusieurs labels d'une liste de messages.
+    """
     return _remove_labels_internal(message_ids, label_names)
 
 
@@ -534,7 +576,9 @@ def gmail_add_label(
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
 ) -> dict:
-    """Ajoute un libellé à un message Gmail."""
+    """
+    Ajoute un libellé à un message Gmail.
+    """
     return _add_labels_internal([message_id], [label_name], create_if_missing)
 
 
@@ -548,7 +592,9 @@ def gmail_remove_label(
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
 ) -> dict:
-    """Retire un libellé d'un message Gmail."""
+    """
+    Retire un libellé d'un message Gmail.
+    """
     return _remove_labels_internal([message_id], [label_name])
 
 
@@ -563,7 +609,9 @@ def gmail_mark_as_read(
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
 ) -> dict:
-    """Marque des messages comme lus."""
+    """
+    Marque des messages comme lus.
+    """
     try:
         service = get_gmail_service()
         succeeded, failed = [], []
@@ -596,7 +644,9 @@ def gmail_mark_as_unread(
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
 ) -> dict:
-    """Marque des messages comme non lus."""
+    """
+    Marque des messages comme non lus.
+    """
     try:
         service = get_gmail_service()
         succeeded, failed = [], []
@@ -629,7 +679,9 @@ def gmail_star_messages(
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
 ) -> dict:
-    """Ajoute une étoile à des messages."""
+    """
+    Ajoute une étoile à des messages.
+    """
     try:
         service = get_gmail_service()
         succeeded, failed = [], []
@@ -663,7 +715,13 @@ def gmail_delete_messages(
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
 ) -> dict:
-    """Supprime des messages Gmail."""
+    """
+    Supprime des messages Gmail.
+
+    Args:
+        message_ids: Liste d'IDs de messages à supprimer
+        permanent: Si True, suppression définitive. Si False, déplace vers la corbeille.
+    """
     try:
         service = get_gmail_service()
         succeeded, failed = [], []
@@ -704,7 +762,9 @@ def gmail_send_email(
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
 ) -> dict:
-    """Envoie un email via Gmail."""
+    """
+    Envoie un email via Gmail.
+    """
     try:
         service = get_gmail_service()
 
