@@ -164,11 +164,15 @@ def _add_labels_internal(
                     return {
                         "success": False,
                         "error": f"Impossible de créer le label '{label_name}'",
+                        "messages_succeeded": 0,
+                        "messages_failed": len(message_ids),
                     }
             else:
                 return {
                     "success": False,
                     "error": f"Label '{label_name}' introuvable.",
+                    "messages_succeeded": 0,
+                    "messages_failed": len(message_ids),
                 }
 
         succeeded, failed = [], []
@@ -180,19 +184,25 @@ def _add_labels_internal(
                     body={"addLabelIds": label_ids},
                 ).execute()
                 succeeded.append(msg_id)
-            except HttpError:
-                failed.append(msg_id)
+            except HttpError as e:
+                failed.append({"id": msg_id, "error": str(e)})
 
         return {
-            "success": True,
+            "success": len(succeeded) > 0,
             "labels_applied": label_names,
             "messages_succeeded": len(succeeded),
             "messages_failed": len(failed),
             "succeeded_ids": succeeded,
-            "failed_ids": failed,
+            "failed_ids": [f["id"] for f in failed],
+            "failed_details": failed,
         }
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        return {
+            "success": False,
+            "error": str(e),
+            "messages_succeeded": 0,
+            "messages_failed": len(message_ids),
+        }
 
 
 def _remove_labels_internal(
@@ -212,6 +222,8 @@ def _remove_labels_internal(
                 return {
                     "success": False,
                     "error": f"Label '{label_name}' introuvable.",
+                    "messages_succeeded": 0,
+                    "messages_failed": len(message_ids),
                 }
 
         succeeded, failed = [], []
@@ -223,17 +235,25 @@ def _remove_labels_internal(
                     body={"removeLabelIds": label_ids},
                 ).execute()
                 succeeded.append(msg_id)
-            except HttpError:
-                failed.append(msg_id)
+            except HttpError as e:
+                failed.append({"id": msg_id, "error": str(e)})
 
         return {
-            "success": True,
+            "success": len(succeeded) > 0,
             "labels_removed": label_names,
             "messages_succeeded": len(succeeded),
             "messages_failed": len(failed),
+            "succeeded_ids": succeeded,
+            "failed_ids": [f["id"] for f in failed],
+            "failed_details": failed,
         }
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        return {
+            "success": False,
+            "error": str(e),
+            "messages_succeeded": 0,
+            "messages_failed": len(message_ids),
+        }
 
 
 def _get_message_summary_internal(message_id: str, max_body_length: int = 2000) -> dict:
@@ -358,7 +378,7 @@ def gmail_get_message_summary(
 
 @mcp.tool
 def gmail_get_multiple_summaries(
-    message_ids: List[str],  # important : schéma "array of string" pour l'IA
+    message_ids: List[str],
     # Paramètres système n8n (ignorés)
     sessionId: Optional[str] = None,
     action: Optional[str] = None,
@@ -370,7 +390,6 @@ def gmail_get_multiple_summaries(
 
     Args:
         message_ids: Liste d'identifiants de messages Gmail (strings).
-                     Si l'IA envoie par erreur des objets, on tente d'en extraire un champ 'id' ou 'message_id'.
     """
     try:
         summaries: List[dict] = []
@@ -390,7 +409,6 @@ def gmail_get_multiple_summaries(
             }
 
         for idx, raw_item in enumerate(message_ids):
-            # Tolérance : si l'IA envoie un dict, on tente d'extraire l'id
             actual_id: Optional[str] = None
 
             if isinstance(raw_item, str):
@@ -623,16 +641,24 @@ def gmail_mark_as_read(
                     body={"removeLabelIds": ["UNREAD"]},
                 ).execute()
                 succeeded.append(msg_id)
-            except HttpError:
-                failed.append(msg_id)
+            except HttpError as e:
+                failed.append({"id": msg_id, "error": str(e)})
 
         return {
-            "success": True,
-            "marked_as_read": len(succeeded),
-            "failed": len(failed),
+            "success": len(succeeded) > 0,
+            "messages_succeeded": len(succeeded),
+            "messages_failed": len(failed),
+            "succeeded_ids": succeeded,
+            "failed_ids": [f["id"] for f in failed],
+            "failed_details": failed,
         }
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        return {
+            "success": False,
+            "error": str(e),
+            "messages_succeeded": 0,
+            "messages_failed": len(message_ids),
+        }
 
 
 @mcp.tool
@@ -658,16 +684,24 @@ def gmail_mark_as_unread(
                     body={"addLabelIds": ["UNREAD"]},
                 ).execute()
                 succeeded.append(msg_id)
-            except HttpError:
-                failed.append(msg_id)
+            except HttpError as e:
+                failed.append({"id": msg_id, "error": str(e)})
 
         return {
-            "success": True,
-            "marked_as_unread": len(succeeded),
-            "failed": len(failed),
+            "success": len(succeeded) > 0,
+            "messages_succeeded": len(succeeded),
+            "messages_failed": len(failed),
+            "succeeded_ids": succeeded,
+            "failed_ids": [f["id"] for f in failed],
+            "failed_details": failed,
         }
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        return {
+            "success": False,
+            "error": str(e),
+            "messages_succeeded": 0,
+            "messages_failed": len(message_ids),
+        }
 
 
 @mcp.tool
@@ -693,16 +727,24 @@ def gmail_star_messages(
                     body={"addLabelIds": ["STARRED"]},
                 ).execute()
                 succeeded.append(msg_id)
-            except HttpError:
-                failed.append(msg_id)
+            except HttpError as e:
+                failed.append({"id": msg_id, "error": str(e)})
 
         return {
-            "success": True,
-            "starred": len(succeeded),
-            "failed": len(failed),
+            "success": len(succeeded) > 0,
+            "messages_succeeded": len(succeeded),
+            "messages_failed": len(failed),
+            "succeeded_ids": succeeded,
+            "failed_ids": [f["id"] for f in failed],
+            "failed_details": failed,
         }
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        return {
+            "success": False,
+            "error": str(e),
+            "messages_succeeded": 0,
+            "messages_failed": len(message_ids),
+        }
 
 
 @mcp.tool
@@ -736,17 +778,25 @@ def gmail_delete_messages(
                         userId="me", id=msg_id
                     ).execute()
                 succeeded.append(msg_id)
-            except HttpError:
-                failed.append(msg_id)
+            except HttpError as e:
+                failed.append({"id": msg_id, "error": str(e)})
 
         return {
-            "success": True,
-            "deleted": len(succeeded),
-            "failed": len(failed),
+            "success": len(succeeded) > 0,
+            "messages_succeeded": len(succeeded),
+            "messages_failed": len(failed),
+            "succeeded_ids": succeeded,
+            "failed_ids": [f["id"] for f in failed],
+            "failed_details": failed,
             "permanent": permanent,
         }
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        return {
+            "success": False,
+            "error": str(e),
+            "messages_succeeded": 0,
+            "messages_failed": len(message_ids),
+        }
 
 
 @mcp.tool
