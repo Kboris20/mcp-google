@@ -47,6 +47,7 @@ mcp = FastMCP("mcp_google")
 # ==================== Utilitaires ====================
 
 def _normalize_label_name(name: str) -> str:
+    """Normalise un nom de label pour comparaison."""
     return re.sub(r"\s+", " ", name.strip().lower())
 
 
@@ -84,7 +85,15 @@ def _extract_text_from_payload(payload: dict, max_length: int = 2000) -> str:
 # ==================== Tools : Lecture d'emails ====================
 
 @mcp.tool
-def gmail_list_messages(query: str = "is:unread", max_results: int = 10) -> dict:
+def gmail_list_messages(
+    query: str = "is:unread",
+    max_results: int = 10,
+    # Paramètres système n8n (ignorés)
+    sessionId: Optional[str] = None,
+    action: Optional[str] = None,
+    chatInput: Optional[str] = None,
+    toolCallId: Optional[str] = None,
+) -> dict:
     """
     Liste les messages Gmail selon une requête.
 
@@ -117,11 +126,22 @@ def gmail_list_messages(query: str = "is:unread", max_results: int = 10) -> dict
 
 
 @mcp.tool
-def gmail_get_message_summary(message_id: str) -> dict:
+def gmail_get_message_summary(
+    message_id: str,
+    # Paramètres système n8n (ignorés)
+    sessionId: Optional[str] = None,
+    action: Optional[str] = None,
+    chatInput: Optional[str] = None,
+    toolCallId: Optional[str] = None,
+) -> dict:
     """
-    Résumé détaillé d'un message.
+    Récupère un résumé détaillé et exploitable d'un message Gmail.
 
-    Retourne: id, subject, from, to, date, snippet, labels, body_preview, summary_text.
+    Args:
+        message_id: ID du message Gmail
+    
+    Returns:
+        dict avec: id, subject, from, to, date, snippet, labels, body_preview, summary_text
     """
     try:
         service = get_gmail_service()
@@ -181,8 +201,24 @@ Corps du message:
 
 
 @mcp.tool
-def gmail_get_multiple_summaries(message_ids: List[str]) -> dict:
-    """Récupère les résumés de plusieurs messages en une fois."""
+def gmail_get_multiple_summaries(
+    message_ids: List[str],
+    # Paramètres système n8n (ignorés)
+    sessionId: Optional[str] = None,
+    action: Optional[str] = None,
+    chatInput: Optional[str] = None,
+    toolCallId: Optional[str] = None,
+) -> dict:
+    """
+    Récupère les résumés de plusieurs messages en une seule fois.
+    Optimisé pour traiter des lots d'emails.
+    
+    Args:
+        message_ids: Liste d'IDs de messages Gmail
+    
+    Returns:
+        dict avec 'summaries' (liste de résumés) et 'errors' (liste des échecs)
+    """
     summaries = []
     errors = []
     for msg_id in message_ids:
@@ -202,8 +238,19 @@ def gmail_get_multiple_summaries(message_ids: List[str]) -> dict:
 # ==================== Tools : Labels ====================
 
 @mcp.tool
-def gmail_list_labels() -> dict:
-    """Liste les labels (en mettant en avant les labels utilisateur)."""
+def gmail_list_labels(
+    # Paramètres système n8n (ignorés)
+    sessionId: Optional[str] = None,
+    action: Optional[str] = None,
+    chatInput: Optional[str] = None,
+    toolCallId: Optional[str] = None,
+) -> dict:
+    """
+    Liste tous les labels Gmail de l'utilisateur.
+    
+    Returns:
+        dict avec 'labels' (liste d'objets {id, name, type})
+    """
     try:
         service = get_gmail_service()
         results = service.users().labels().list(userId="me").execute()
@@ -224,8 +271,26 @@ def gmail_list_labels() -> dict:
 
 
 @mcp.tool
-def gmail_find_label(name: str, fuzzy: bool = True) -> dict:
-    """Recherche un label par nom (exact ou approx.)."""
+def gmail_find_label(
+    name: str,
+    fuzzy: bool = True,
+    # Paramètres système n8n (ignorés)
+    sessionId: Optional[str] = None,
+    action: Optional[str] = None,
+    chatInput: Optional[str] = None,
+    toolCallId: Optional[str] = None,
+) -> dict:
+    """
+    Recherche un label par nom (exact ou approximatif).
+    Utile pour éviter les doublons avant de créer un nouveau label.
+    
+    Args:
+        name: Nom du label recherché
+        fuzzy: Si True, recherche aussi des correspondances approximatives
+    
+    Returns:
+        dict avec match_type ('exact', 'fuzzy', 'none') et label(s) trouvé(s)
+    """
     try:
         service = get_gmail_service()
         results = service.users().labels().list(userId="me").execute()
@@ -258,8 +323,23 @@ def gmail_find_label(name: str, fuzzy: bool = True) -> dict:
 
 
 @mcp.tool
-def gmail_create_label(name: str) -> dict:
-    """Crée un label (si inexistant)."""
+def gmail_create_label(
+    name: str,
+    # Paramètres système n8n (ignorés)
+    sessionId: Optional[str] = None,
+    action: Optional[str] = None,
+    chatInput: Optional[str] = None,
+    toolCallId: Optional[str] = None,
+) -> dict:
+    """
+    Crée un nouveau label Gmail.
+    
+    Args:
+        name: Nom du nouveau label
+    
+    Returns:
+        dict avec le label créé
+    """
     try:
         # vérifier si existe déjà
         existing = gmail_find_label(name, fuzzy=False)
@@ -285,10 +365,61 @@ def gmail_create_label(name: str) -> dict:
 
 
 @mcp.tool
-def gmail_add_labels_to_messages(
-    message_ids: List[str], label_names: List[str], create_if_missing: bool = True
+def gmail_delete_label(
+    label_id: str,
+    # Paramètres système n8n (ignorés)
+    sessionId: Optional[str] = None,
+    action: Optional[str] = None,
+    chatInput: Optional[str] = None,
+    toolCallId: Optional[str] = None,
 ) -> dict:
-    """Ajoute des labels à une liste de messages."""
+    """
+    Supprime un label Gmail (n'affecte pas les messages, retire juste le label).
+    
+    Args:
+        label_id: ID du label à supprimer
+    
+    Returns:
+        dict confirmant la suppression
+    """
+    try:
+        service = get_gmail_service()
+        service.users().labels().delete(userId="me", id=label_id).execute()
+        
+        return {
+            "success": True,
+            "message": f"Label {label_id} supprimé avec succès."
+        }
+    except HttpError as e:
+        return {
+            "success": False,
+            "error": f"Erreur lors de la suppression du label: {e}"
+        }
+
+
+@mcp.tool
+def gmail_add_labels_to_messages(
+    message_ids: List[str],
+    label_names: List[str],
+    create_if_missing: bool = True,
+    # Paramètres système n8n (ignorés)
+    sessionId: Optional[str] = None,
+    action: Optional[str] = None,
+    chatInput: Optional[str] = None,
+    toolCallId: Optional[str] = None,
+) -> dict:
+    """
+    Ajoute un ou plusieurs labels à une liste de messages.
+    Peut créer automatiquement les labels s'ils n'existent pas.
+    
+    Args:
+        message_ids: Liste d'IDs de messages
+        label_names: Liste de noms de labels à appliquer
+        create_if_missing: Si True, crée les labels manquants automatiquement
+    
+    Returns:
+        dict avec le nombre de messages traités et les détails
+    """
     try:
         service = get_gmail_service()
         label_ids = []
@@ -336,11 +467,82 @@ def gmail_add_labels_to_messages(
         return {"success": False, "error": str(e)}
 
 
+@mcp.tool
+def gmail_remove_labels_from_messages(
+    message_ids: List[str],
+    label_names: List[str],
+    # Paramètres système n8n (ignorés)
+    sessionId: Optional[str] = None,
+    action: Optional[str] = None,
+    chatInput: Optional[str] = None,
+    toolCallId: Optional[str] = None,
+) -> dict:
+    """
+    Retire un ou plusieurs labels d'une liste de messages.
+    
+    Args:
+        message_ids: Liste d'IDs de messages
+        label_names: Liste de noms de labels à retirer
+    
+    Returns:
+        dict avec le nombre de messages traités
+    """
+    try:
+        service = get_gmail_service()
+        label_ids = []
+
+        for label_name in label_names:
+            found = gmail_find_label(label_name, fuzzy=False)
+            if found.get("match_type") == "exact":
+                label_ids.append(found["label"]["id"])
+            else:
+                return {
+                    "success": False,
+                    "error": f"Label '{label_name}' introuvable.",
+                }
+
+        succeeded, failed = [], []
+        for msg_id in message_ids:
+            try:
+                service.users().messages().modify(
+                    userId="me",
+                    id=msg_id,
+                    body={"removeLabelIds": label_ids},
+                ).execute()
+                succeeded.append(msg_id)
+            except HttpError:
+                failed.append(msg_id)
+
+        return {
+            "success": True,
+            "labels_removed": label_names,
+            "messages_succeeded": len(succeeded),
+            "messages_failed": len(failed),
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 # ==================== Tools : Actions messages ====================
 
 @mcp.tool
-def gmail_mark_as_read(message_ids: List[str]) -> dict:
-    """Marque des messages comme lus."""
+def gmail_mark_as_read(
+    message_ids: List[str],
+    # Paramètres système n8n (ignorés)
+    sessionId: Optional[str] = None,
+    action: Optional[str] = None,
+    chatInput: Optional[str] = None,
+    toolCallId: Optional[str] = None,
+) -> dict:
+    """
+    Marque des messages comme lus.
+    
+    Args:
+        message_ids: Liste d'IDs de messages
+    
+    Returns:
+        dict avec le nombre de messages marqués
+    """
     try:
         service = get_gmail_service()
         succeeded, failed = [], []
@@ -365,8 +567,107 @@ def gmail_mark_as_read(message_ids: List[str]) -> dict:
 
 
 @mcp.tool
-def gmail_delete_messages(message_ids: List[str], permanent: bool = False) -> dict:
-    """Supprime des messages (corbeille ou définitif)."""
+def gmail_mark_as_unread(
+    message_ids: List[str],
+    # Paramètres système n8n (ignorés)
+    sessionId: Optional[str] = None,
+    action: Optional[str] = None,
+    chatInput: Optional[str] = None,
+    toolCallId: Optional[str] = None,
+) -> dict:
+    """
+    Marque des messages comme non lus.
+    
+    Args:
+        message_ids: Liste d'IDs de messages
+    
+    Returns:
+        dict avec le nombre de messages marqués
+    """
+    try:
+        service = get_gmail_service()
+        succeeded, failed = [], []
+        for msg_id in message_ids:
+            try:
+                service.users().messages().modify(
+                    userId="me",
+                    id=msg_id,
+                    body={"addLabelIds": ["UNREAD"]},
+                ).execute()
+                succeeded.append(msg_id)
+            except HttpError:
+                failed.append(msg_id)
+
+        return {
+            "success": True,
+            "marked_as_unread": len(succeeded),
+            "failed": len(failed),
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@mcp.tool
+def gmail_star_messages(
+    message_ids: List[str],
+    # Paramètres système n8n (ignorés)
+    sessionId: Optional[str] = None,
+    action: Optional[str] = None,
+    chatInput: Optional[str] = None,
+    toolCallId: Optional[str] = None,
+) -> dict:
+    """
+    Ajoute une étoile à des messages.
+    
+    Args:
+        message_ids: Liste d'IDs de messages
+    
+    Returns:
+        dict avec le nombre de messages marqués
+    """
+    try:
+        service = get_gmail_service()
+        succeeded, failed = [], []
+        for msg_id in message_ids:
+            try:
+                service.users().messages().modify(
+                    userId="me",
+                    id=msg_id,
+                    body={"addLabelIds": ["STARRED"]},
+                ).execute()
+                succeeded.append(msg_id)
+            except HttpError:
+                failed.append(msg_id)
+
+        return {
+            "success": True,
+            "starred": len(succeeded),
+            "failed": len(failed),
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@mcp.tool
+def gmail_delete_messages(
+    message_ids: List[str],
+    permanent: bool = False,
+    # Paramètres système n8n (ignorés)
+    sessionId: Optional[str] = None,
+    action: Optional[str] = None,
+    chatInput: Optional[str] = None,
+    toolCallId: Optional[str] = None,
+) -> dict:
+    """
+    Supprime des messages Gmail.
+    
+    Args:
+        message_ids: Liste d'IDs de messages à supprimer
+        permanent: Si True, suppression définitive. Si False, déplace vers la corbeille.
+    
+    Returns:
+        dict avec le nombre de messages supprimés et les échecs
+    """
     try:
         service = get_gmail_service()
         succeeded, failed = [], []
@@ -401,8 +702,25 @@ def gmail_send_email(
     body: str,
     cc: Optional[str] = None,
     bcc: Optional[str] = None,
+    # Paramètres système n8n (ignorés)
+    sessionId: Optional[str] = None,
+    action: Optional[str] = None,
+    chatInput: Optional[str] = None,
+    toolCallId: Optional[str] = None,
 ) -> dict:
-    """Envoie un email simple via Gmail."""
+    """
+    Envoie un email via Gmail.
+    
+    Args:
+        to: Destinataire (email)
+        subject: Sujet de l'email
+        body: Corps du message (texte brut)
+        cc: Copie (optionnel)
+        bcc: Copie cachée (optionnel)
+    
+    Returns:
+        dict avec l'ID du message envoyé
+    """
     try:
         service = get_gmail_service()
 
