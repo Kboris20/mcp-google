@@ -148,6 +148,8 @@ def _add_labels_internal(
     create_if_missing: bool = True,
 ) -> dict:
     """Logique interne pour ajouter des labels à des messages."""
+    total_requested = len(message_ids)
+    
     try:
         service = get_gmail_service()
         label_ids = []
@@ -163,16 +165,18 @@ def _add_labels_internal(
                 else:
                     return {
                         "success": False,
-                        "error": f"Impossible de créer le label '{label_name}'",
+                        "error": f"Impossible de créer le label '{label_name}': {created.get('error', 'raison inconnue')}",
+                        "total_requested": total_requested,
                         "messages_succeeded": 0,
-                        "messages_failed": len(message_ids),
+                        "messages_failed": total_requested,
                     }
             else:
                 return {
                     "success": False,
-                    "error": f"Label '{label_name}' introuvable.",
+                    "error": f"Label '{label_name}' introuvable et création désactivée.",
+                    "total_requested": total_requested,
                     "messages_succeeded": 0,
-                    "messages_failed": len(message_ids),
+                    "messages_failed": total_requested,
                 }
 
         succeeded, failed = [], []
@@ -190,6 +194,7 @@ def _add_labels_internal(
         return {
             "success": len(succeeded) > 0,
             "labels_applied": label_names,
+            "total_requested": total_requested,
             "messages_succeeded": len(succeeded),
             "messages_failed": len(failed),
             "succeeded_ids": succeeded,
@@ -199,9 +204,10 @@ def _add_labels_internal(
     except Exception as e:
         return {
             "success": False,
-            "error": str(e),
+            "error": f"Erreur interne dans _add_labels_internal: {str(e)}",
+            "total_requested": total_requested,
             "messages_succeeded": 0,
-            "messages_failed": len(message_ids),
+            "messages_failed": total_requested,
         }
 
 
@@ -210,6 +216,8 @@ def _remove_labels_internal(
     label_names: List[str],
 ) -> dict:
     """Logique interne pour retirer des labels de messages."""
+    total_requested = len(message_ids)
+    
     try:
         service = get_gmail_service()
         label_ids = []
@@ -222,8 +230,9 @@ def _remove_labels_internal(
                 return {
                     "success": False,
                     "error": f"Label '{label_name}' introuvable.",
+                    "total_requested": total_requested,
                     "messages_succeeded": 0,
-                    "messages_failed": len(message_ids),
+                    "messages_failed": total_requested,
                 }
 
         succeeded, failed = [], []
@@ -241,6 +250,7 @@ def _remove_labels_internal(
         return {
             "success": len(succeeded) > 0,
             "labels_removed": label_names,
+            "total_requested": total_requested,
             "messages_succeeded": len(succeeded),
             "messages_failed": len(failed),
             "succeeded_ids": succeeded,
@@ -250,9 +260,10 @@ def _remove_labels_internal(
     except Exception as e:
         return {
             "success": False,
-            "error": str(e),
+            "error": f"Erreur interne dans _remove_labels_internal: {str(e)}",
+            "total_requested": total_requested,
             "messages_succeeded": 0,
-            "messages_failed": len(message_ids),
+            "messages_failed": total_requested,
         }
 
 
@@ -470,16 +481,18 @@ def gmail_list_labels(
     toolCallId: Optional[str] = None,
 ) -> dict:
     """
-    Liste tous les labels Gmail de l'utilisateur.
+    Liste tous les labels Gmail de l'utilisateur (uniquement les labels utilisateur, pas les labels système).
     """
     try:
         service = get_gmail_service()
         results = service.users().labels().list(userId="me").execute()
         labels = results.get("labels", [])
 
+        # Filtrer uniquement les labels utilisateur (type = "user")
         user_labels = [
             {"id": lbl["id"], "name": lbl["name"], "type": lbl.get("type", "user")}
             for lbl in labels
+            if lbl.get("type") == "user"
         ]
 
         return {
@@ -488,7 +501,7 @@ def gmail_list_labels(
             "labels": user_labels,
         }
     except HttpError as e:
-        return {"success": False, "error": f"Erreur labels: {e}", "labels": []}
+        return {"success": False, "error": f"Erreur labels: {e}", "labels": [], "count": 0}
 
 
 @mcp.tool
@@ -630,6 +643,7 @@ def gmail_mark_as_read(
     """
     Marque des messages comme lus.
     """
+    total_requested = len(message_ids)
     try:
         service = get_gmail_service()
         succeeded, failed = [], []
@@ -646,6 +660,7 @@ def gmail_mark_as_read(
 
         return {
             "success": len(succeeded) > 0,
+            "total_requested": total_requested,
             "messages_succeeded": len(succeeded),
             "messages_failed": len(failed),
             "succeeded_ids": succeeded,
@@ -656,8 +671,9 @@ def gmail_mark_as_read(
         return {
             "success": False,
             "error": str(e),
+            "total_requested": total_requested,
             "messages_succeeded": 0,
-            "messages_failed": len(message_ids),
+            "messages_failed": total_requested,
         }
 
 
@@ -673,6 +689,7 @@ def gmail_mark_as_unread(
     """
     Marque des messages comme non lus.
     """
+    total_requested = len(message_ids)
     try:
         service = get_gmail_service()
         succeeded, failed = [], []
@@ -689,6 +706,7 @@ def gmail_mark_as_unread(
 
         return {
             "success": len(succeeded) > 0,
+            "total_requested": total_requested,
             "messages_succeeded": len(succeeded),
             "messages_failed": len(failed),
             "succeeded_ids": succeeded,
@@ -699,8 +717,9 @@ def gmail_mark_as_unread(
         return {
             "success": False,
             "error": str(e),
+            "total_requested": total_requested,
             "messages_succeeded": 0,
-            "messages_failed": len(message_ids),
+            "messages_failed": total_requested,
         }
 
 
@@ -716,6 +735,7 @@ def gmail_star_messages(
     """
     Ajoute une étoile à des messages.
     """
+    total_requested = len(message_ids)
     try:
         service = get_gmail_service()
         succeeded, failed = [], []
@@ -732,6 +752,7 @@ def gmail_star_messages(
 
         return {
             "success": len(succeeded) > 0,
+            "total_requested": total_requested,
             "messages_succeeded": len(succeeded),
             "messages_failed": len(failed),
             "succeeded_ids": succeeded,
@@ -742,8 +763,9 @@ def gmail_star_messages(
         return {
             "success": False,
             "error": str(e),
+            "total_requested": total_requested,
             "messages_succeeded": 0,
-            "messages_failed": len(message_ids),
+            "messages_failed": total_requested,
         }
 
 
@@ -764,6 +786,7 @@ def gmail_delete_messages(
         message_ids: Liste d'IDs de messages à supprimer
         permanent: Si True, suppression définitive. Si False, déplace vers la corbeille.
     """
+    total_requested = len(message_ids)
     try:
         service = get_gmail_service()
         succeeded, failed = [], []
@@ -783,6 +806,7 @@ def gmail_delete_messages(
 
         return {
             "success": len(succeeded) > 0,
+            "total_requested": total_requested,
             "messages_succeeded": len(succeeded),
             "messages_failed": len(failed),
             "succeeded_ids": succeeded,
@@ -794,8 +818,9 @@ def gmail_delete_messages(
         return {
             "success": False,
             "error": str(e),
+            "total_requested": total_requested,
             "messages_succeeded": 0,
-            "messages_failed": len(message_ids),
+            "messages_failed": total_requested,
         }
 
 
