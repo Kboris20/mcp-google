@@ -522,6 +522,123 @@ def gmail_remove_labels_from_messages(
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+@mcp.tool
+def gmail_add_label(
+    message_id: str,
+    label_name: str,
+    create_if_missing: bool = True,
+    # Paramètres système n8n (ignorés)
+    sessionId: Optional[str] = None,
+    action: Optional[str] = None,
+    chatInput: Optional[str] = None,
+    toolCallId: Optional[str] = None,
+) -> dict:
+    """
+    Ajoute un libellé à un message Gmail.
+    Si le libellé n'existe pas, il peut être créé automatiquement.
+    
+    Args:
+        message_id: ID du message Gmail
+        label_name: Nom du libellé à ajouter (ex: "Publicité")
+        create_if_missing: Si True, crée le libellé s'il n'existe pas
+    
+    Returns:
+        dict confirmant l'ajout du libellé
+    """
+    try:
+        service = get_gmail_service()
+        
+        # Trouver ou créer le libellé
+        found = gmail_find_label(label_name, fuzzy=False)
+        if found.get("match_type") == "exact":
+            label_id = found["label"]["id"]
+        elif create_if_missing:
+            created = gmail_create_label(label_name)
+            if created.get("success"):
+                label_id = created["label"]["id"]
+            else:
+                return {
+                    "success": False,
+                    "error": f"Impossible de créer le libellé '{label_name}'",
+                }
+        else:
+            return {
+                "success": False,
+                "error": f"Libellé '{label_name}' introuvable.",
+            }
+        
+        # Ajouter le libellé au message
+        service.users().messages().modify(
+            userId="me",
+            id=message_id,
+            body={"addLabelIds": [label_id]},
+        ).execute()
+        
+        return {
+            "success": True,
+            "message_id": message_id,
+            "label_added": label_name,
+            "label_id": label_id,
+        }
+    except HttpError as e:
+        return {
+            "success": False,
+            "error": f"Erreur lors de l'ajout du libellé: {e}",
+        }
+
+
+@mcp.tool
+def gmail_remove_label(
+    message_id: str,
+    label_name: str,
+    # Paramètres système n8n (ignorés)
+    sessionId: Optional[str] = None,
+    action: Optional[str] = None,
+    chatInput: Optional[str] = None,
+    toolCallId: Optional[str] = None,
+) -> dict:
+    """
+    Retire un libellé d'un message Gmail.
+    
+    Args:
+        message_id: ID du message Gmail
+        label_name: Nom du libellé à retirer (ex: "INBOX" pour archiver)
+    
+    Returns:
+        dict confirmant le retrait du libellé
+    """
+    try:
+        service = get_gmail_service()
+        
+        # Trouver le libellé
+        found = gmail_find_label(label_name, fuzzy=False)
+        if found.get("match_type") != "exact":
+            return {
+                "success": False,
+                "error": f"Libellé '{label_name}' introuvable.",
+            }
+        
+        label_id = found["label"]["id"]
+        
+        # Retirer le libellé du message
+        service.users().messages().modify(
+            userId="me",
+            id=message_id,
+            body={"removeLabelIds": [label_id]},
+        ).execute()
+        
+        return {
+            "success": True,
+            "message_id": message_id,
+            "label_removed": label_name,
+            "label_id": label_id,
+        }
+    except HttpError as e:
+        return {
+            "success": False,
+            "error": f"Erreur lors du retrait du libellé: {e}",
+        }
+
 
 # ==================== Tools : Actions messages ====================
 
@@ -753,3 +870,4 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", "8000"))
     print(f"🚀 Démarrage du serveur MCP Gmail sur le port {port}")
     mcp.run(transport="http", host="0.0.0.0", port=port, path="/mcp")
+
