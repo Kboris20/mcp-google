@@ -583,7 +583,7 @@ def gmail_get_public_signatures(
 @mcp.tool
 def gmail_list_messages(
     query: str = "is:unread",
-    max_results: int = 10,
+    max_results: int = 500,
     sessionId: Optional[str] = None,
     action: Optional[str] = None,
     chatInput: Optional[str] = None,
@@ -594,11 +594,11 @@ def gmail_list_messages(
 
     Args:
         query: Requête Gmail (ex: 'is:unread', 'from:xxx', 'subject:urgent').
-        max_results: Nombre max (1–100).
+        max_results: Nombre max (0–500).
     """
     try:
         service = get_gmail_service()
-        max_results_clamped = min(max(1, max_results), 100)
+        max_results_clamped = min(max(0, max_results), 500)
 
         res = service.users().messages().list(
             userId="me", q=query, maxResults=max_results_clamped
@@ -1097,3 +1097,4 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", "8000"))
     print(f"🚀 Démarrage du serveur MCP Gmail sur le port {port}")
     mcp.run(transport="http", host="0.0.0.0", port=port, path="/mcp")
+
