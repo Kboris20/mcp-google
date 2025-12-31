@@ -1,7 +1,7 @@
 import os
 import base64
 import re
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Dict
 
 from fastmcp import FastMCP
 from google.oauth2.credentials import Credentials
@@ -326,6 +326,262 @@ Corps du message:
         }
 
 
+# ==================== Signatures des tools publics (pour introspection) ====================
+
+TOOLS_SIGNATURES: Dict[str, Any] = {
+    "gmail_list_messages": {
+        "description": "Liste les messages Gmail selon une requête.",
+        "args": {
+            "query": {
+                "type": "string",
+                "required": False,
+                "default": "is:unread",
+                "description": "Requête Gmail (ex: 'is:unread', 'from:xxx', 'subject:urgent')."
+            },
+            "max_results": {
+                "type": "integer",
+                "required": False,
+                "default": 10,
+                "min": 1,
+                "max": 100,
+                "description": "Nombre maximal de messages à retourner (1–100)."
+            }
+        }
+    },
+    "gmail_get_message_summary": {
+        "description": "Récupère un résumé détaillé d'un message Gmail.",
+        "args": {
+            "message_id": {
+                "type": "string",
+                "required": True,
+                "description": "ID du message Gmail."
+            }
+        }
+    },
+    "gmail_get_multiple_summaries": {
+        "description": "Récupère les résumés de plusieurs messages.",
+        "args": {
+            "message_ids": {
+                "type": "array<string>",
+                "required": True,
+                "description": "Liste d'IDs de messages Gmail."
+            }
+        }
+    },
+    "gmail_list_labels": {
+        "description": "Liste tous les labels Gmail de l'utilisateur (uniquement les labels utilisateur).",
+        "args": {}
+    },
+    "gmail_find_label": {
+        "description": "Recherche un label par nom (exact ou approximatif).",
+        "args": {
+            "name": {
+                "type": "string",
+                "required": True,
+                "description": "Nom du label à rechercher."
+            },
+            "fuzzy": {
+                "type": "boolean",
+                "required": False,
+                "default": True,
+                "description": "Recherche approximative si True."
+            }
+        }
+    },
+    "gmail_create_label": {
+        "description": "Crée un nouveau label Gmail.",
+        "args": {
+            "name": {
+                "type": "string",
+                "required": True,
+                "description": "Nom du label à créer."
+            }
+        }
+    },
+    "gmail_delete_label": {
+        "description": "Supprime un label Gmail (n'affecte pas les messages).",
+        "args": {
+            "label_id": {
+                "type": "string",
+                "required": True,
+                "description": "ID du label à supprimer."
+            }
+        }
+    },
+    "gmail_add_labels": {
+        "description": "Ajoute un ou plusieurs labels à une liste de messages.",
+        "args": {
+            "message_ids": {
+                "type": "array<string>",
+                "required": True,
+                "description": "Liste d'IDs de messages."
+            },
+            "label_names": {
+                "type": "array<string>",
+                "required": True,
+                "description": "Liste de noms de labels à ajouter."
+            },
+            "create_if_missing": {
+                "type": "boolean",
+                "required": False,
+                "default": True,
+                "description": "Créer automatiquement les labels s'ils n'existent pas."
+            }
+        }
+    },
+    "gmail_remove_labels": {
+        "description": "Retire un ou plusieurs labels d'une liste de messages.",
+        "args": {
+            "message_ids": {
+                "type": "array<string>",
+                "required": True,
+                "description": "Liste d'IDs de messages."
+            },
+            "label_names": {
+                "type": "array<string>",
+                "required": True,
+                "description": "Liste de noms de labels à retirer."
+            }
+        }
+    },
+    "gmail_add_label": {
+        "description": "Ajoute un libellé à un message Gmail.",
+        "args": {
+            "message_id": {
+                "type": "string",
+                "required": True,
+                "description": "ID du message."
+            },
+            "label_name": {
+                "type": "string",
+                "required": True,
+                "description": "Nom du label à ajouter."
+            },
+            "create_if_missing": {
+                "type": "boolean",
+                "required": False,
+                "default": True,
+                "description": "Créer le label s'il n'existe pas."
+            }
+        }
+    },
+    "gmail_remove_label": {
+        "description": "Retire un libellé d'un message Gmail.",
+        "args": {
+            "message_id": {
+                "type": "string",
+                "required": True,
+                "description": "ID du message."
+            },
+            "label_name": {
+                "type": "string",
+                "required": True,
+                "description": "Nom du label à retirer."
+            }
+        }
+    },
+    "gmail_mark_as_read": {
+        "description": "Marque des messages comme lus.",
+        "args": {
+            "message_ids": {
+                "type": "array<string>",
+                "required": True,
+                "description": "Liste d'IDs de messages."
+            }
+        }
+    },
+    "gmail_mark_as_unread": {
+        "description": "Marque des messages comme non lus.",
+        "args": {
+            "message_ids": {
+                "type": "array<string>",
+                "required": True,
+                "description": "Liste d'IDs de messages."
+            }
+        }
+    },
+    "gmail_star_messages": {
+        "description": "Ajoute une étoile à des messages.",
+        "args": {
+            "message_ids": {
+                "type": "array<string>",
+                "required": True,
+                "description": "Liste d'IDs de messages."
+            }
+        }
+    },
+    "gmail_delete_messages": {
+        "description": "Supprime des messages Gmail.",
+        "args": {
+            "message_ids": {
+                "type": "array<string>",
+                "required": True,
+                "description": "Liste d'IDs de messages à supprimer."
+            },
+            "permanent": {
+                "type": "boolean",
+                "required": False,
+                "default": False,
+                "description": "Si True, suppression définitive. Si False, déplace vers la corbeille."
+            }
+        }
+    },
+    "gmail_send_email": {
+        "description": "Envoie un email via Gmail.",
+        "args": {
+            "to": {
+                "type": "string",
+                "required": True,
+                "description": "Adresse email du destinataire."
+            },
+            "subject": {
+                "type": "string",
+                "required": True,
+                "description": "Objet de l'email."
+            },
+            "body": {
+                "type": "string",
+                "required": True,
+                "description": "Corps de l'email."
+            },
+            "cc": {
+                "type": "string",
+                "required": False,
+                "description": "Adresse email en copie."
+            },
+            "bcc": {
+                "type": "string",
+                "required": False,
+                "description": "Adresse email en copie cachée."
+            }
+        }
+    }
+}
+
+
+# ==================== Tools : Introspection ====================
+
+@mcp.tool
+def gmail_get_public_signatures(
+    # Paramètres système n8n (ignorés)
+    sessionId: Optional[str] = None,
+    action: Optional[str] = None,
+    chatInput: Optional[str] = None,
+    toolCallId: Optional[str] = None,
+    **_extra: Any,
+) -> dict:
+    """
+    Retourne la description des principaux tools publics exposés par ce MCP,
+    incluant leurs paramètres et une courte description.
+
+    Utile pour que des agents LLM découvrent dynamiquement la signature des tools.
+    """
+    return {
+        "success": True,
+        "tools": TOOLS_SIGNATURES,
+    }
+
+
 # ==================== Tools : Lecture d'emails ====================
 
 @mcp.tool
@@ -337,6 +593,7 @@ def gmail_list_messages(
     action: Optional[str] = None,
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
+    **_extra: Any,
 ) -> dict:
     """
     Liste les messages Gmail selon une requête.
@@ -377,6 +634,7 @@ def gmail_get_message_summary(
     action: Optional[str] = None,
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
+    **_extra: Any,
 ) -> dict:
     """
     Récupère un résumé détaillé et exploitable d'un message Gmail.
@@ -395,6 +653,7 @@ def gmail_get_multiple_summaries(
     action: Optional[str] = None,
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
+    **_extra: Any,
 ) -> dict:
     """
     Récupère les résumés de plusieurs messages en une seule fois.
@@ -479,6 +738,7 @@ def gmail_list_labels(
     action: Optional[str] = None,
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
+    **_extra: Any,
 ) -> dict:
     """
     Liste tous les labels Gmail de l'utilisateur (uniquement les labels utilisateur, pas les labels système).
@@ -513,6 +773,7 @@ def gmail_find_label(
     action: Optional[str] = None,
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
+    **_extra: Any,
 ) -> dict:
     """
     Recherche un label par nom (exact ou approximatif).
@@ -528,6 +789,7 @@ def gmail_create_label(
     action: Optional[str] = None,
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
+    **_extra: Any,
 ) -> dict:
     """
     Crée un nouveau label Gmail.
@@ -543,6 +805,7 @@ def gmail_delete_label(
     action: Optional[str] = None,
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
+    **_extra: Any,
 ) -> dict:
     """
     Supprime un label Gmail (n'affecte pas les messages, retire juste le label).
@@ -572,6 +835,7 @@ def gmail_add_labels(
     action: Optional[str] = None,
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
+    **_extra: Any,
 ) -> dict:
     """
     Ajoute un ou plusieurs labels à une liste de messages.
@@ -589,6 +853,7 @@ def gmail_remove_labels(
     action: Optional[str] = None,
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
+    **_extra: Any,
 ) -> dict:
     """
     Retire un ou plusieurs labels d'une liste de messages.
@@ -606,6 +871,7 @@ def gmail_add_label(
     action: Optional[str] = None,
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
+    **_extra: Any,
 ) -> dict:
     """
     Ajoute un libellé à un message Gmail.
@@ -622,6 +888,7 @@ def gmail_remove_label(
     action: Optional[str] = None,
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
+    **_extra: Any,
 ) -> dict:
     """
     Retire un libellé d'un message Gmail.
@@ -639,6 +906,7 @@ def gmail_mark_as_read(
     action: Optional[str] = None,
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
+    **_extra: Any,
 ) -> dict:
     """
     Marque des messages comme lus.
@@ -685,6 +953,7 @@ def gmail_mark_as_unread(
     action: Optional[str] = None,
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
+    **_extra: Any,
 ) -> dict:
     """
     Marque des messages comme non lus.
@@ -731,6 +1000,7 @@ def gmail_star_messages(
     action: Optional[str] = None,
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
+    **_extra: Any,
 ) -> dict:
     """
     Ajoute une étoile à des messages.
@@ -778,6 +1048,7 @@ def gmail_delete_messages(
     action: Optional[str] = None,
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
+    **_extra: Any,
 ) -> dict:
     """
     Supprime des messages Gmail.
@@ -836,6 +1107,7 @@ def gmail_send_email(
     action: Optional[str] = None,
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
+    **_extra: Any,
 ) -> dict:
     """
     Envoie un email via Gmail.
