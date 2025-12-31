@@ -149,7 +149,6 @@ def _add_labels_internal(
 ) -> dict:
     """Logique interne pour ajouter des labels à des messages."""
     total_requested = len(message_ids)
-    
     try:
         service = get_gmail_service()
         label_ids = []
@@ -217,7 +216,6 @@ def _remove_labels_internal(
 ) -> dict:
     """Logique interne pour retirer des labels de messages."""
     total_requested = len(message_ids)
-    
     try:
         service = get_gmail_service()
         label_ids = []
@@ -563,12 +561,10 @@ TOOLS_SIGNATURES: Dict[str, Any] = {
 
 @mcp.tool
 def gmail_get_public_signatures(
-    # Paramètres système n8n (ignorés)
     sessionId: Optional[str] = None,
     action: Optional[str] = None,
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
-    **_extra: Any,
 ) -> dict:
     """
     Retourne la description des principaux tools publics exposés par ce MCP,
@@ -588,12 +584,10 @@ def gmail_get_public_signatures(
 def gmail_list_messages(
     query: str = "is:unread",
     max_results: int = 10,
-    # Paramètres système n8n (ignorés)
     sessionId: Optional[str] = None,
     action: Optional[str] = None,
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
-    **_extra: Any,
 ) -> dict:
     """
     Liste les messages Gmail selon une requête.
@@ -629,18 +623,13 @@ def gmail_list_messages(
 @mcp.tool
 def gmail_get_message_summary(
     message_id: str,
-    # Paramètres système n8n (ignorés)
     sessionId: Optional[str] = None,
     action: Optional[str] = None,
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
-    **_extra: Any,
 ) -> dict:
     """
     Récupère un résumé détaillé et exploitable d'un message Gmail.
-
-    Args:
-        message_id: ID du message Gmail
     """
     return _get_message_summary_internal(message_id)
 
@@ -648,18 +637,13 @@ def gmail_get_message_summary(
 @mcp.tool
 def gmail_get_multiple_summaries(
     message_ids: List[str],
-    # Paramètres système n8n (ignorés)
     sessionId: Optional[str] = None,
     action: Optional[str] = None,
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
-    **_extra: Any,
 ) -> dict:
     """
     Récupère les résumés de plusieurs messages en une seule fois.
-
-    Args:
-        message_ids: Liste d'identifiants de messages Gmail (strings).
     """
     try:
         summaries: List[dict] = []
@@ -733,12 +717,10 @@ def gmail_get_multiple_summaries(
 
 @mcp.tool
 def gmail_list_labels(
-    # Paramètres système n8n (ignorés)
     sessionId: Optional[str] = None,
     action: Optional[str] = None,
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
-    **_extra: Any,
 ) -> dict:
     """
     Liste tous les labels Gmail de l'utilisateur (uniquement les labels utilisateur, pas les labels système).
@@ -748,7 +730,6 @@ def gmail_list_labels(
         results = service.users().labels().list(userId="me").execute()
         labels = results.get("labels", [])
 
-        # Filtrer uniquement les labels utilisateur (type = "user")
         user_labels = [
             {"id": lbl["id"], "name": lbl["name"], "type": lbl.get("type", "user")}
             for lbl in labels
@@ -768,12 +749,10 @@ def gmail_list_labels(
 def gmail_find_label(
     name: str,
     fuzzy: bool = True,
-    # Paramètres système n8n (ignorés)
     sessionId: Optional[str] = None,
     action: Optional[str] = None,
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
-    **_extra: Any,
 ) -> dict:
     """
     Recherche un label par nom (exact ou approximatif).
@@ -784,12 +763,10 @@ def gmail_find_label(
 @mcp.tool
 def gmail_create_label(
     name: str,
-    # Paramètres système n8n (ignorés)
     sessionId: Optional[str] = None,
     action: Optional[str] = None,
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
-    **_extra: Any,
 ) -> dict:
     """
     Crée un nouveau label Gmail.
@@ -800,12 +777,10 @@ def gmail_create_label(
 @mcp.tool
 def gmail_delete_label(
     label_id: str,
-    # Paramètres système n8n (ignorés)
     sessionId: Optional[str] = None,
     action: Optional[str] = None,
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
-    **_extra: Any,
 ) -> dict:
     """
     Supprime un label Gmail (n'affecte pas les messages, retire juste le label).
@@ -830,12 +805,10 @@ def gmail_add_labels(
     message_ids: List[str],
     label_names: List[str],
     create_if_missing: bool = True,
-    # Paramètres système n8n (ignorés)
     sessionId: Optional[str] = None,
     action: Optional[str] = None,
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
-    **_extra: Any,
 ) -> dict:
     """
     Ajoute un ou plusieurs labels à une liste de messages.
@@ -848,12 +821,10 @@ def gmail_add_labels(
 def gmail_remove_labels(
     message_ids: List[str],
     label_names: List[str],
-    # Paramètres système n8n (ignorés)
     sessionId: Optional[str] = None,
     action: Optional[str] = None,
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
-    **_extra: Any,
 ) -> dict:
     """
     Retire un ou plusieurs labels d'une liste de messages.
@@ -866,12 +837,10 @@ def gmail_add_label(
     message_id: str,
     label_name: str,
     create_if_missing: bool = True,
-    # Paramètres système n8n (ignorés)
     sessionId: Optional[str] = None,
     action: Optional[str] = None,
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
-    **_extra: Any,
 ) -> dict:
     """
     Ajoute un libellé à un message Gmail.
@@ -883,12 +852,10 @@ def gmail_add_label(
 def gmail_remove_label(
     message_id: str,
     label_name: str,
-    # Paramètres système n8n (ignorés)
     sessionId: Optional[str] = None,
     action: Optional[str] = None,
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
-    **_extra: Any,
 ) -> dict:
     """
     Retire un libellé d'un message Gmail.
@@ -901,12 +868,10 @@ def gmail_remove_label(
 @mcp.tool
 def gmail_mark_as_read(
     message_ids: List[str],
-    # Paramètres système n8n (ignorés)
     sessionId: Optional[str] = None,
     action: Optional[str] = None,
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
-    **_extra: Any,
 ) -> dict:
     """
     Marque des messages comme lus.
@@ -948,12 +913,10 @@ def gmail_mark_as_read(
 @mcp.tool
 def gmail_mark_as_unread(
     message_ids: List[str],
-    # Paramètres système n8n (ignorés)
     sessionId: Optional[str] = None,
     action: Optional[str] = None,
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
-    **_extra: Any,
 ) -> dict:
     """
     Marque des messages comme non lus.
@@ -995,12 +958,10 @@ def gmail_mark_as_unread(
 @mcp.tool
 def gmail_star_messages(
     message_ids: List[str],
-    # Paramètres système n8n (ignorés)
     sessionId: Optional[str] = None,
     action: Optional[str] = None,
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
-    **_extra: Any,
 ) -> dict:
     """
     Ajoute une étoile à des messages.
@@ -1043,19 +1004,13 @@ def gmail_star_messages(
 def gmail_delete_messages(
     message_ids: List[str],
     permanent: bool = False,
-    # Paramètres système n8n (ignorés)
     sessionId: Optional[str] = None,
     action: Optional[str] = None,
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
-    **_extra: Any,
 ) -> dict:
     """
     Supprime des messages Gmail.
-
-    Args:
-        message_ids: Liste d'IDs de messages à supprimer
-        permanent: Si True, suppression définitive. Si False, déplace vers la corbeille.
     """
     total_requested = len(message_ids)
     try:
@@ -1102,12 +1057,10 @@ def gmail_send_email(
     body: str,
     cc: Optional[str] = None,
     bcc: Optional[str] = None,
-    # Paramètres système n8n (ignorés)
     sessionId: Optional[str] = None,
     action: Optional[str] = None,
     chatInput: Optional[str] = None,
     toolCallId: Optional[str] = None,
-    **_extra: Any,
 ) -> dict:
     """
     Envoie un email via Gmail.
