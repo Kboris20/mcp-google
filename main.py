@@ -1,6 +1,7 @@
 import os
 import base64
 import re
+import json
 from typing import List, Optional, Any, Dict
 
 from fastmcp import FastMCP
@@ -366,6 +367,21 @@ TOOLS_SIGNATURES: Dict[str, Any] = {
             }
         }
     },
+    "gmail_get_message_labels": {
+        "description": "Récupère les labels appliqués à un message ou une liste de messages (labelIds + labelNames).",
+        "args": {
+            "message_id": {
+                "type": "string",
+                "required": False,
+                "description": "ID du message Gmail (utiliser message_id ou message_ids)."
+            },
+            "message_ids": {
+                "type": "array<string>",
+                "required": False,
+                "description": "Liste d'IDs de messages Gmail."
+            }
+        }
+    },
     "gmail_list_labels": {
         "description": "Liste tous les labels Gmail de l'utilisateur (uniquement les labels utilisateur).",
         "args": {}
@@ -711,6 +727,80 @@ def gmail_get_multiple_summaries(
             "summaries": [],
             "errors": [{"error": f"Erreur interne dans gmail_get_multiple_summaries: {e}"}],
         }
+
+
+# ==================== Tool: Récupérer les labels d'un ou plusieurs messages ====================
+
+@mcp.tool
+def gmail_get_message_labels(
+    message_id: Optional[str] = None,
+    message_ids: Optional[List[str]] = None,
+    sessionId: Optional[str] = None,
+    action: Optional[str] = None,
+    chatInput: Optional[str] = None,
+    toolCallId: Optional[str] = None,
+) -> dict:
+    """
+    Retourne les labelIds et labelNames appliqués à un message ou plusieurs messages.
+    Si `message_id` est fourni, retourne les labels pour ce message.
+    Si `message_ids` est fourni, retourne les labels pour chaque message de la liste.
+    """
+    try:
+        if not message_id and not message_ids:
+            return {"success": False, "error": "Veuillez fournir 'message_id' ou 'message_ids'."}
+
+        # Normaliser l'ensemble des IDs à traiter
+        ids: List[str] = []
+        if message_id:
+            ids.append(str(message_id))
+        if message_ids:
+            if isinstance(message_ids, list):
+                ids.extend([str(x) for x in message_ids])
+            else:
+                # tolérance : si on reçoit une chaîne JSON encodée
+                try:
+                    parsed = json.loads(message_ids)
+                    if isinstance(parsed, list):
+                        ids.extend([str(x) for x in parsed])
+                except Exception:
+                    # ignore, sera géré plus bas si vide
+                    pass
+
+        if len(ids) == 0:
+            return {"success": False, "error": "Aucun message_id valide trouvé dans 'message_id' ou 'message_ids'."}
+
+        service = get_gmail_service()
+
+        # Récupérer la liste des labels pour mapper id -> name
+        labels_res = service.users().labels().list(userId="me").execute()
+        labels_list = labels_res.get("labels", [])
+        id_to_name = {lbl.get("id"): lbl.get("name", "") for lbl in labels_list}
+
+        results: Dict[str, Any] = {}
+        errors: List[Dict[str, str]] = []
+
+        for mid in ids:
+            try:
+                # format minimal est suffisant pour obtenir labelIds
+                msg = service.users().messages().get(userId="me", id=mid, format="minimal").execute()
+                lbl_ids = msg.get("labelIds", []) or []
+                lbl_names = [id_to_name.get(lid, lid) for lid in lbl_ids]
+                results[mid] = {"labelIds": lbl_ids, "labelNames": lbl_names}
+            except HttpError as e:
+                errors.append({"message_id": mid, "error": str(e)})
+            except Exception as e:
+                errors.append({"message_id": mid, "error": str(e)})
+
+        return {
+            "success": len(results) > 0,
+            "count": len(results),
+            "labels": results,
+            "errors": errors,
+        }
+    except HttpError as e:
+        return {"success": False, "error": f"Erreur Gmail API: {e}"}
+    except Exception as e:
+        return {"success": False, "error": f"Erreur interne: {e}"}
 
 
 # ==================== Tools : Labels ====================
@@ -1097,4 +1187,3 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", "8000"))
     print(f"🚀 Démarrage du serveur MCP Gmail sur le port {port}")
     mcp.run(transport="http", host="0.0.0.0", port=port, path="/mcp")
-
