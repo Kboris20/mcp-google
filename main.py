@@ -1,4 +1,3 @@
-Voici le main.py de mon mcp_serveur:
 import os
 import base64
 import re
@@ -343,8 +342,8 @@ TOOLS_SIGNATURES: Dict[str, Any] = {
                 "required": False,
                 "default": 50,
                 "min": 1,
-                "max": 100,
-                "description": "Nombre maximal de messages à retourner (1–100)."
+                "max": 500,
+                "description": "Nombre maximal de messages à retourner (1–500)."
             }
         }
     },
@@ -439,7 +438,7 @@ TOOLS_SIGNATURES: Dict[str, Any] = {
             "create_if_missing": {
                 "type": "boolean",
                 "required": False,
-                "default": False,
+                "default": True,
                 "description": "Créer automatiquement les labels s'ils n'existent pas."
             }
         }
@@ -475,7 +474,7 @@ TOOLS_SIGNATURES: Dict[str, Any] = {
             "create_if_missing": {
                 "type": "boolean",
                 "required": False,
-                "default": False,
+                "default": True,
                 "description": "Créer le label s'il n'existe pas."
             }
         }
@@ -538,6 +537,16 @@ TOOLS_SIGNATURES: Dict[str, Any] = {
                 "required": False,
                 "default": False,
                 "description": "Si True, suppression définitive. Si False, déplace vers la corbeille."
+            }
+        }
+    },
+    "gmail_archive_messages": {
+        "description": "Archive des messages Gmail en retirant le label INBOX.",
+        "args": {
+            "message_ids": {
+                "type": "array<string>",
+                "required": True,
+                "description": "Liste d'IDs de messages à archiver."
             }
         }
     },
@@ -1142,6 +1151,51 @@ def gmail_delete_messages(
 
 
 @mcp.tool
+def gmail_archive_messages(
+    message_ids: List[str],
+    sessionId: Optional[str] = None,
+    action: Optional[str] = None,
+    chatInput: Optional[str] = None,
+    toolCallId: Optional[str] = None,
+) -> dict:
+    """
+    Archive des messages Gmail en retirant le label INBOX.
+    """
+    total_requested = len(message_ids)
+    try:
+        service = get_gmail_service()
+        succeeded, failed = [], []
+        for msg_id in message_ids:
+            try:
+                service.users().messages().modify(
+                    userId="me",
+                    id=msg_id,
+                    body={"removeLabelIds": ["INBOX"]},
+                ).execute()
+                succeeded.append(msg_id)
+            except HttpError as e:
+                failed.append({"id": msg_id, "error": str(e)})
+
+        return {
+            "success": len(succeeded) > 0,
+            "total_requested": total_requested,
+            "messages_succeeded": len(succeeded),
+            "messages_failed": len(failed),
+            "succeeded_ids": succeeded,
+            "failed_ids": [f["id"] for f in failed],
+            "failed_details": failed,
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Erreur interne dans gmail_archive_messages: {str(e)}",
+            "total_requested": total_requested,
+            "messages_succeeded": 0,
+            "messages_failed": total_requested,
+        }
+
+
+@mcp.tool
 def gmail_send_email(
     to: str,
     subject: str,
@@ -1188,10 +1242,3 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", "8000"))
     print(f"🚀 Démarrage du serveur MCP Gmail sur le port {port}")
     mcp.run(transport="http", host="0.0.0.0", port=port, path="/mcp")
-
-
-
-
-Il manque les signatures pour supprimer et archiver un ou plusieurs emails
-
-Je veux que tu ajouter ces fonctions tout en gardant la robustesse du script
