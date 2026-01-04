@@ -1,3 +1,4 @@
+Voici le main.py de mon mcp_serveur:
 import os
 import base64
 import re
@@ -438,7 +439,7 @@ TOOLS_SIGNATURES: Dict[str, Any] = {
             "create_if_missing": {
                 "type": "boolean",
                 "required": False,
-                "default": True,
+                "default": False,
                 "description": "Créer automatiquement les labels s'ils n'existent pas."
             }
         }
@@ -474,7 +475,7 @@ TOOLS_SIGNATURES: Dict[str, Any] = {
             "create_if_missing": {
                 "type": "boolean",
                 "required": False,
-                "default": True,
+                "default": False,
                 "description": "Créer le label s'il n'existe pas."
             }
         }
@@ -1188,3 +1189,9 @@ if __name__ == "__main__":
     print(f"🚀 Démarrage du serveur MCP Gmail sur le port {port}")
     mcp.run(transport="http", host="0.0.0.0", port=port, path="/mcp")
 
+
+
+
+Il manque les signatures pour supprimer et archiver un ou plusieurs emails
+
+Je veux que tu ajouter ces fonctions tout en gardant la robustesse du script
