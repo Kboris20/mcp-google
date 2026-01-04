@@ -334,13 +334,13 @@ TOOLS_SIGNATURES: Dict[str, Any] = {
             "query": {
                 "type": "string",
                 "required": False,
-                "default": "is:unread",
+                "default": "in:inbox",
                 "description": "Requête Gmail (ex: 'is:unread', 'from:xxx', 'subject:urgent')."
             },
             "max_results": {
                 "type": "integer",
                 "required": False,
-                "default": 10,
+                "default": 50,
                 "min": 1,
                 "max": 100,
                 "description": "Nombre maximal de messages à retourner (1–100)."
@@ -1187,3 +1187,4 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", "8000"))
     print(f"🚀 Démarrage du serveur MCP Gmail sur le port {port}")
     mcp.run(transport="http", host="0.0.0.0", port=port, path="/mcp")
+
