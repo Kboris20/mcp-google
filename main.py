@@ -10,6 +10,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from email.mime.text import MIMEText
 
+
 # ==================== Config OAuth ====================
 
 SCOPES = [
@@ -1242,3 +1243,4 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", "8000"))
     print(f"🚀 Démarrage du serveur MCP Gmail sur le port {port}")
     mcp.run(transport="http", host="0.0.0.0", port=port, path="/mcp")
+
